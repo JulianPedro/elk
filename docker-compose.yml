@@ -1,11 +1,8 @@
 version: '3.2'
 
 services:
-  elasticsearch:
-    build:
-      context: elasticsearch/
-      args:
-        ELK_VERSION: $ELK_VERSION
+  elasticsearch_1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.1
     volumes:
       - type: bind
         source: ./elasticsearch/config/elasticsearch.yml
@@ -27,11 +24,46 @@ services:
       - "9200:9200"
       - "9300:9300"
     environment:
-      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
       ELASTIC_PASSWORD: changeme
       # Use single node discovery in order to disable production mode and avoid bootstrap checks.
       # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
-      discovery.type: single-node
+      discovery.type: ''
+      network.host: 192.168.0.18
+      node.name: elasticsearch_1
+      cluster.initial_master_nodes: 192.168.0.18, 192.168.0.17
+    networks:
+      - elk
+
+  elasticsearch_2:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.1
+    volumes:
+      - type: bind
+        source: ./elasticsearch/config/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      - type: volume
+        source: elasticsearch
+        target: /usr/share/elasticsearch/data
+      # (!) TLS certificates. Generate using instructions from tls/README.md.
+      - type: bind
+        source: ./tls/elasticsearch/elasticsearch.p12
+        target: /usr/share/elasticsearch/config/elasticsearch.p12
+        read_only: true
+      - type: bind
+        source: ./tls/elasticsearch/http.p12
+        target: /usr/share/elasticsearch/config/http.p12
+        read_only: true
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ELASTIC_PASSWORD: changeme
+      # Use single node discovery in order to disable production mode and avoid bootstrap checks.
+      # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
+      discovery.type: ''
+      network.host: 192.168.0.17
+      node.name: elasticsearch_2
+      cluster.initial_master_nodes: 192.168.0.18, 192.168.0.17
     networks:
       - elk
 
@@ -59,12 +91,8 @@ services:
       - "5000:5000/tcp"
       - "5000:5000/udp"
       - "9600:9600"
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
       - elk
-    depends_on:
-      - elasticsearch
 
   kibana:
     build:
@@ -85,8 +113,6 @@ services:
       - "5601:5601"
     networks:
       - elk
-    depends_on:
-      - elasticsearch
 
 networks:
   elk:
